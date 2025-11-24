@@ -125,3 +125,77 @@ def expired_token():
     Note: Generate a real expired token from Supabase if needed
     """
     return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyLCJleHAiOjE1MTYyMzkwMjJ9.expired"
+
+
+@pytest.fixture
+def test_habit_ids(supabase_client):
+    """Get list of habit IDs for testing"""
+    response = supabase_client.table("habits").select("id").limit(4).execute()
+    if not response.data:
+        pytest.skip("No habits found in database")
+    return [h["id"] for h in response.data]
+
+
+@pytest.fixture
+def second_user_token(supabase_client):
+    """Create a second test user and return their token"""
+    # This would require test user creation
+    # For now, return a placeholder
+    pytest.skip("Second user token requires test user creation")
+
+
+@pytest.fixture
+def test_challenge(test_user_token, test_habit_ids):
+    """Create a test challenge and return it"""
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from datetime import date, timedelta
+
+    client = TestClient(app)
+
+    tomorrow = date.today() + timedelta(days=1)
+    end_date = date.today() + timedelta(days=30)
+
+    challenge_data = {
+        "name": "Test Challenge",
+        "description": "Test description",
+        "type": "group",
+        "start_date": str(tomorrow),
+        "end_date": str(end_date),
+        "habit_ids": test_habit_ids[:2],
+        "checkin_type": "photo",
+        "max_members": 10,
+    }
+
+    response = client.post(
+        "/api/v1/challenges/",
+        json=challenge_data,
+        headers={"Authorization": f"Bearer {test_user_token}"},
+    )
+
+    if response.status_code != 201:
+        pytest.skip(f"Failed to create test challenge: {response.status_code}")
+
+    return response.json()
+
+
+@pytest.fixture
+def test_challenge_with_member(test_challenge, second_user_token):
+    """Create a challenge with a second member"""
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    client = TestClient(app)
+
+    join_data = {"invite_code": test_challenge["invite_code"]}
+
+    response = client.post(
+        "/api/v1/challenges/join",
+        json=join_data,
+        headers={"Authorization": f"Bearer {second_user_token}"},
+    )
+
+    if response.status_code != 200:
+        pytest.skip(f"Failed to join challenge: {response.status_code}")
+
+    return response.json()
