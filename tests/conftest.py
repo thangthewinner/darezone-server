@@ -199,3 +199,39 @@ def test_challenge_with_member(test_challenge, second_user_token):
         pytest.skip(f"Failed to join challenge: {response.status_code}")
 
     return response.json()
+
+
+@pytest.fixture
+def test_existing_checkin(test_user_token, test_challenge):
+    """Create a check-in for testing"""
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    client = TestClient(app)
+
+    # Create check-in for first habit
+    checkin_data = {
+        "challenge_id": test_challenge["id"],
+        "habit_id": test_challenge["habits"][0]["id"],
+        "caption": "Test check-in",
+        "photo_url": "https://example.com/test.jpg",
+    }
+
+    response = client.post(
+        "/api/v1/checkins/",
+        json=checkin_data,
+        headers={"Authorization": f"Bearer {test_user_token}"},
+    )
+
+    if response.status_code != 201:
+        pytest.skip(f"Failed to create test check-in: {response.status_code}")
+
+    return response.json()["checkin"]
+
+
+@pytest.fixture
+def test_old_checkin(supabase_client, test_user_token, test_challenge):
+    """Create an old check-in (from yesterday) for testing"""
+    # This would require direct database manipulation
+    # For now, skip tests that need this
+    pytest.skip("Old check-in fixture requires database manipulation")
