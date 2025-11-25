@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     POINTS_PER_CHECKIN: int = 10
     POINTS_STREAK_MULTIPLIER: int = 2
 
+    # Push Notifications
+    EXPO_ACCESS_TOKEN: str = ""  # Optional: Expo push notification token
+
     class Config:
         env_file = ".env"
         case_sensitive = True
