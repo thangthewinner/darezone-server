@@ -39,6 +39,14 @@ class Settings(BaseSettings):
     # Push Notifications
     EXPO_ACCESS_TOKEN: str = ""  # Optional: Expo push notification token
 
+    # Storage Settings
+    STORAGE_BUCKET_PHOTOS: str = "darezone-photos"
+    STORAGE_BUCKET_VIDEOS: str = "darezone-videos"
+    STORAGE_BUCKET_AVATARS: str = "darezone-avatars"
+    MAX_UPLOAD_SIZE_MB: int = 10  # Max size for photos in MB
+    MAX_VIDEO_SIZE_MB: int = 50  # Max size for videos in MB
+    MAX_AVATAR_SIZE_MB: int = 5  # Max size for avatars in MB
+
     class Config:
         env_file = ".env"
         case_sensitive = True
