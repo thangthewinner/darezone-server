@@ -68,22 +68,3 @@ black app tests
 # Type checking
 mypy app
 ```
-
-## Features
-
-✅ **Phase 1 & 2 Complete:**
-- User authentication (Supabase)
-- Challenge management
-- Daily check-ins
-- Friendship system
-- Notifications
-- Media upload
-- Hitch reminders
-- Stats & history
-
-## Tech Stack
-
-- **Framework:** FastAPI 0.104+
-- **Database:** Supabase PostgreSQL
-- **Auth:** Supabase Auth (JWT)
-- **Python:** 3.11+
