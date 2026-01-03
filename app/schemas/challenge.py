@@ -5,11 +5,11 @@ from enum import Enum
 
 
 class ChallengeType(str, Enum):
-    """Challenge type enum"""
+    """Challenge type enum (B2C-only, program type removed)"""
 
     individual = "individual"
     group = "group"
-    program = "program"
+    # program = "program"  # B2B feature removed
 
 
 class ChallengeStatus(str, Enum):

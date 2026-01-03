@@ -20,6 +20,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     description="DareZone habit-building social application API",
+    redirect_slashes=False,  # Prevent 307 redirects that lose JWT token
 )
 
 # Add CORS Middleware

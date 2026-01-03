@@ -131,6 +131,7 @@ async def create_challenge(
         )
 
 
+@router.get("", response_model=PaginatedChallenges)
 @router.get("/", response_model=PaginatedChallenges)
 async def list_challenges(
     status_filter: Optional[str] = Query(

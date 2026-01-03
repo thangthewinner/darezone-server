@@ -67,6 +67,7 @@ async def get_current_active_user(
 ) -> Dict[str, Any]:
     """
     Get current user and verify they have active profile in database
+    Auto-creates profile if it doesn't exist
 
     Args:
         current_user: User from JWT token
@@ -76,26 +77,44 @@ async def get_current_active_user(
         Dict containing user auth data + profile data
 
     Raises:
-        HTTPException: 403 if user profile not found or inactive
         HTTPException: 500 if database error
     """
     try:
-        # Check if user profile exists and is active
+        # Check if user profile exists
         response = (
             supabase.table("user_profiles")
             .select("*")
             .eq("id", current_user["id"])
-            .single()
             .execute()
         )
 
-        if not response.data:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="User profile not found. Please complete setup.",
+        # If profile doesn't exist, create it
+        if not response.data or len(response.data) == 0:
+            logger.info(f"Creating profile for user {current_user['id']}")
+            
+            # Create new profile
+            new_profile = {
+                "id": current_user["id"],
+                "email": current_user["email"],
+                "display_name": current_user.get("user_metadata", {}).get("display_name") or current_user["email"].split("@")[0],
+                "account_type": "b2c",  # Default to B2C
+            }
+            
+            create_response = (
+                supabase.table("user_profiles")
+                .insert(new_profile)
+                .execute()
             )
-
-        profile = response.data
+            
+            if not create_response.data:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to create user profile",
+                )
+            
+            profile = create_response.data[0]
+        else:
+            profile = response.data[0]
 
         # Combine auth user + profile data
         return {**current_user, "profile": profile}

@@ -132,3 +132,6 @@ dmypy.json
 .env.local
 .env.production
 test_*.py.bak
+
+# AI Documentation (not for version control)
+docs/
