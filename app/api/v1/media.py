@@ -5,6 +5,9 @@ from app.core.security import get_current_active_user
 from app.core.config import settings
 import uuid
 from typing import Literal
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -93,20 +96,37 @@ async def upload_media(
     else:  # avatar
         bucket = settings.STORAGE_BUCKET_AVATARS
 
-    # Upload to Supabase Storage
-    try:
-        result = supabase.storage.from_(bucket).upload(
-            unique_filename,
-            contents,
-            {
-                "content-type": file.content_type,
-                "cache-control": "3600",
-                "upsert": "false",  # Don't overwrite existing files
-            },
-        )
+    # Direct Upload to Supabase Storage API (Bypassing supabase-py proxy bug)
+    import httpx
+    
+    upload_url = f"{settings.SUPABASE_URL}/storage/v1/object/{bucket}/{unique_filename}"
+    headers = {
+        "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}",
+        "x-upsert": "false",
+        # Content-Type is handled by httpx when passing content
+    }
 
-        # Get public URL for the uploaded file
-        public_url = supabase.storage.from_(bucket).get_public_url(unique_filename)
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                upload_url,
+                content=contents,
+                headers=headers,
+                timeout=30.0
+            )
+
+            if response.status_code not in [200, 201]:
+                error_detail = response.text
+                if "Duplicate" in error_detail or "already exists" in error_detail:
+                     raise HTTPException(
+                        status_code=409,
+                        detail="File already exists. Please try again with a different file.",
+                    )
+                raise Exception(f"Storage API Error: {response.status_code} - {error_detail}")
+
+        # Construct public URL manually since we know the format
+        # URL Format: https://project.supabase.co/storage/v1/object/public/{bucket}/{path}
+        public_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/{bucket}/{unique_filename}"
 
         return {
             "success": True,
@@ -117,15 +137,11 @@ async def upload_media(
             "bucket": bucket,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
-        error_message = str(e)
-        # Handle duplicate file error
-        if "duplicate" in error_message.lower() or "already exists" in error_message.lower():
-            raise HTTPException(
-                status_code=409,
-                detail="File already exists. Please try again with a different file.",
-            )
-        raise HTTPException(status_code=500, detail=f"Upload failed: {error_message}")
+        logger.error(f"Upload failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 
 @router.delete("")
