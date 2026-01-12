@@ -610,16 +610,42 @@ async def get_challenge_progress(
         total_habits = len(habits)
         habit_map = {h["habit_id"]: h["habits"]["name"] for h in habits}
 
-        # Get active members
+        # Get active members (Using App-level Join)
         members_response = (
             supabase.table("challenge_members")
-            .select("user_id, user_profiles(display_name, avatar_url)")
+            .select("user_id")
             .eq("challenge_id", challenge_id)
             .eq("status", "active")
             .execute()
         )
 
-        members = members_response.data
+        members_data = members_response.data
+        if not members_data:
+             # Handle empty members case if needed, though rare for active challenge
+             pass
+
+        # Fetch profiles separately
+        member_ids = [m["user_id"] for m in members_data]
+        profiles_response = (
+            supabase.table("user_profiles")
+            .select("id, display_name, avatar_url")
+            .in_("id", member_ids)
+            .execute()
+        )
+        
+        profile_map = {p["id"]: p for p in profiles_response.data}
+        
+        # Merge data structures
+        members = []
+        for m in members_data:
+            profile = profile_map.get(m["user_id"], {})
+            members.append({
+                "user_id": m["user_id"],
+                "user_profiles": {
+                    "display_name": profile.get("display_name"),
+                    "avatar_url": profile.get("avatar_url")
+                }
+            })
 
         # Get check-ins for target date
         checkins_response = (
@@ -838,27 +864,51 @@ async def get_challenge_details(
 async def get_challenge_members_list(
     challenge_id: str, supabase: Client
 ) -> List[ChallengeMember]:
-    """Get list of challenge members with stats"""
+    """
+    Get list of challenge members with stats
+    
+    Refactored to use Application-level Join to avoid PostgREST relationship errors.
+    """
+    # 1. Get members without profile embedding
     members_response = (
         supabase.table("challenge_members")
         .select(
             "id, user_id, role, status, current_streak, longest_streak, "
             "total_checkins, points_earned, hitch_count, joined_at, left_at, "
-            "last_checkin_at, user_profiles(display_name, avatar_url)"
+            "last_checkin_at"
         )
         .eq("challenge_id", challenge_id)
         .order("joined_at")
         .execute()
     )
 
+    if not members_response.data:
+        return []
+
+    # 2. Get user profiles for these members
+    user_ids = [m["user_id"] for m in members_response.data]
+    
+    profiles_response = (
+        supabase.table("user_profiles")
+        .select("id, display_name, avatar_url")
+        .in_("id", user_ids)
+        .execute()
+    )
+    
+    # Create map: user_id -> profile
+    profile_map = {p["id"]: p for p in profiles_response.data}
+
+    # 3. Merge data
     members = []
     for m in members_response.data:
+        profile = profile_map.get(m["user_id"], {})
+        
         members.append(
             ChallengeMember(
                 id=m["id"],
                 user_id=m["user_id"],
-                display_name=m["user_profiles"]["display_name"] or "User",
-                avatar_url=m["user_profiles"].get("avatar_url"),
+                display_name=profile.get("display_name") or "User",
+                avatar_url=profile.get("avatar_url"),
                 role=m["role"],
                 status=m["status"],
                 stats=MemberStats(
