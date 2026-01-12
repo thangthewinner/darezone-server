@@ -196,12 +196,17 @@ async def list_challenges(
         challenge_list = []
         for challenge in challenges:
             membership = membership_map.get(challenge["id"])
+            
+            # Remove invite_code from challenge dict to avoid duplicate
+            challenge_data = {k: v for k, v in challenge.items() if k != "invite_code"}
+            
+            # Only show invite_code to creator
+            invite_code = challenge["invite_code"] if membership and membership["role"] == "creator" else None
+            
             challenge_list.append(
                 ChallengeList(
-                    **challenge,
-                    invite_code=challenge["invite_code"]
-                    if membership and membership["role"] == "creator"
-                    else None,
+                    **challenge_data,
+                    invite_code=invite_code,
                     my_role=membership["role"] if membership else None,
                     my_status=membership["status"] if membership else None,
                 )

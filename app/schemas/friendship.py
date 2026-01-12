@@ -24,7 +24,16 @@ class FriendshipAction(str, Enum):
 class FriendRequestCreate(BaseModel):
     """Schema for sending a friend request"""
 
-    addressee_id: str = Field(..., description="User ID to send friend request to")
+    addressee_id: str = Field(
+        ..., 
+        description="User ID to send friend request to",
+        validation_alias="friend_id"  # Allow friend_id or addressee_id
+    )
+
+
+class FriendRequestAccept(BaseModel):
+    """Schema for accepting a friend request by user ID"""
+    friend_id: str = Field(..., description="User ID of the friend to accept")
 
 
 class FriendRequestRespond(BaseModel):

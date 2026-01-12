@@ -133,5 +133,12 @@ dmypy.json
 .env.production
 test_*.py.bak
 
-# AI Documentation (not for version control)
+# Temporary files
+server.log
+server_output.log
+*.log
+test_full_flow.sh
+nohup.out
+
+# Documentation (not for version control)
 docs/

@@ -118,88 +118,6 @@ async def update_my_profile(
         )
 
 
-@router.get("/{user_id}", response_model=UserPublicProfile)
-async def get_user_profile(
-    user_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_active_user),
-    supabase: Client = Depends(get_supabase_client),
-):
-    """
-    Get public profile of another user
-
-    Access Control:
-    - Can view if you are friends (status = 'accepted')
-    - Can view if in same active challenge
-    - Cannot view strangers
-
-    Returns limited public information (no email).
-
-    Raises:
-        403: If no relationship exists
-        404: If user not found
-    """
-    # Check if viewing own profile
-    if user_id == current_user["id"]:
-        # Redirect to /me endpoint logic
-        profile = current_user["profile"]
-        stats = await get_user_stats_data(user_id, supabase)
-        return UserPublicProfile(
-            id=profile["id"],
-            display_name=profile.get("display_name") or "You",
-            avatar_url=profile.get("avatar_url"),
-            bio=profile.get("bio"),
-            stats=stats,
-            is_you=True,
-        )
-
-    # Check access permission
-    has_access = await check_user_access(current_user["id"], user_id, supabase)
-
-    if not has_access:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only view profiles of friends or challenge members",
-        )
-
-    # Get user profile (public fields only)
-    try:
-        profile_response = (
-            supabase.table("user_profiles")
-            .select("id, display_name, avatar_url, bio")
-            .eq("id", user_id)
-            .single()
-            .execute()
-        )
-
-        if not profile_response.data:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-            )
-
-        profile = profile_response.data
-
-        # Get stats
-        stats = await get_user_stats_data(user_id, supabase)
-
-        return UserPublicProfile(
-            id=profile["id"],
-            display_name=profile.get("display_name") or "User",
-            avatar_url=profile.get("avatar_url"),
-            bio=profile.get("bio"),
-            stats=stats,
-            is_you=False,
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get user profile: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve user profile",
-        )
-
-
 @router.get("/search", response_model=List[UserSearchResult])
 async def search_users(
     q: str = Query(..., min_length=2, max_length=50, description="Search query"),
@@ -286,6 +204,88 @@ async def search_users(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Search failed",
+        )
+
+
+@router.get("/{user_id}", response_model=UserPublicProfile)
+async def get_user_profile(
+    user_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_active_user),
+    supabase: Client = Depends(get_supabase_client),
+):
+    """
+    Get public profile of another user
+
+    Access Control:
+    - Can view if you are friends (status = 'accepted')
+    - Can view if in same active challenge
+    - Cannot view strangers
+
+    Returns limited public information (no email).
+
+    Raises:
+        403: If no relationship exists
+        404: If user not found
+    """
+    # Check if viewing own profile
+    if user_id == current_user["id"]:
+        # Redirect to /me endpoint logic
+        profile = current_user["profile"]
+        stats = await get_user_stats_data(user_id, supabase)
+        return UserPublicProfile(
+            id=profile["id"],
+            display_name=profile.get("display_name") or "You",
+            avatar_url=profile.get("avatar_url"),
+            bio=profile.get("bio"),
+            stats=stats,
+            is_you=True,
+        )
+
+    # Check access permission
+    has_access = await check_user_access(current_user["id"], user_id, supabase)
+
+    if not has_access:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only view profiles of friends or challenge members",
+        )
+
+    # Get user profile (public fields only)
+    try:
+        profile_response = (
+            supabase.table("user_profiles")
+            .select("id, display_name, avatar_url, bio")
+            .eq("id", user_id)
+            .single()
+            .execute()
+        )
+
+        if not profile_response.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            )
+
+        profile = profile_response.data
+
+        # Get stats
+        stats = await get_user_stats_data(user_id, supabase)
+
+        return UserPublicProfile(
+            id=profile["id"],
+            display_name=profile.get("display_name") or "User",
+            avatar_url=profile.get("avatar_url"),
+            bio=profile.get("bio"),
+            stats=stats,
+            is_you=False,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get user profile: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve user profile",
         )
 
 

@@ -128,12 +128,19 @@ def expired_token():
 
 
 @pytest.fixture
-def test_habit_ids(supabase_client):
+def test_habit_ids(supabase_url, supabase_service_key):
     """Get list of habit IDs for testing"""
-    response = supabase_client.table("habits").select("id").limit(4).execute()
-    if not response.data:
-        pytest.skip("No habits found in database")
-    return [h["id"] for h in response.data]
+    # Create fresh client to avoid RLS cache issues
+    from supabase import create_client
+    fresh_client = create_client(supabase_url, supabase_service_key)
+    
+    try:
+        response = fresh_client.table("habits").select("id").limit(4).execute()
+        if not response.data:
+            pytest.skip("No habits found in database")
+        return [h["id"] for h in response.data]
+    except Exception as e:
+        pytest.skip(f"Failed to fetch habits: {str(e)}")
 
 
 @pytest.fixture

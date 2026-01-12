@@ -8,6 +8,7 @@ from app.core.security import get_current_active_user
 from app.schemas.friendship import (
     FriendRequestCreate,
     FriendRequestRespond,
+    FriendRequestAccept,
     FriendshipBase,
     FriendProfile,
     FriendRequest,
@@ -148,6 +149,74 @@ async def send_friend_request(
         )
 
 
+@router.post("/accept", response_model=FriendshipBase)
+async def accept_friend_request(
+    request: FriendRequestAccept,
+    current_user: Dict[str, Any] = Depends(get_current_active_user),
+    supabase: Client = Depends(get_supabase_client),
+):
+    """
+    Accept a friend request from a specific user (convenience endpoint)
+    """
+    user_id = current_user["id"]
+    friend_id = request.friend_id
+
+    # Find pending request from friend_id to current_user
+    try:
+        response = (
+            supabase.table("friendships")
+            .select("*")
+            .eq("requester_id", friend_id)
+            .eq("addressee_id", user_id)
+            .eq("status", "pending")
+            .execute()
+        )
+
+        if not response.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No pending friend request found from this user",
+            )
+
+        friendship = response.data[0]
+
+        # Update status to accepted
+        updated_friendship = (
+            supabase.table("friendships")
+            .update({"status": "accepted"})
+            .eq("id", friendship["id"])
+            .execute()
+        )
+
+        # Create notification
+        try:
+            supabase.table("notifications").insert(
+                {
+                    "user_id": friend_id,
+                    "type": "friend_accepted",
+                    "title": "Friend request accepted",
+                    "message": f"{current_user['profile'].get('display_name', 'Someone')} accepted your friend request",
+                    "data": {
+                        "friendship_id": friendship["id"],
+                        "user_id": user_id,
+                    },
+                }
+            ).execute()
+        except Exception as e:
+            logger.warning(f"Failed to create notification: {str(e)}")
+
+        return FriendshipBase(**updated_friendship.data[0])
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to accept friend request: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to accept friend request",
+        )
+
+
 @router.post("/requests/{friendship_id}/respond", response_model=FriendshipBase)
 async def respond_to_friend_request(
     friendship_id: str,
@@ -238,7 +307,7 @@ async def respond_to_friend_request(
         )
 
 
-@router.get("/", response_model=FriendshipListResponse)
+@router.get("", response_model=FriendshipListResponse)
 async def list_friends(
     status_filter: str = Query(
         "accepted", description="Filter by status: accepted, pending, all"
@@ -298,6 +367,19 @@ async def list_friends(
             .execute()
         )
 
+        # Get active challenge IDs first to avoid subquery issues
+        active_challenges_query = (
+            supabase.table("challenges")
+            .select("id")
+            .eq("status", "active")
+            .execute()
+        )
+        active_challenge_ids = (
+            [c["id"] for c in active_challenges_query.data]
+            if active_challenges_query.data
+            else []
+        )
+
         # Count active challenges for each friend
         friends = []
         for profile in profiles_response.data:
@@ -305,18 +387,16 @@ async def list_friends(
             friendship = friendship_map[friend_id]
 
             # Count active challenges
-            active_challenges_response = (
-                supabase.table("challenge_members")
-                .select("id", count="exact")
-                .eq("user_id", friend_id)
-                .in_(
-                    "challenge_id",
-                    supabase.table("challenges").select("id").eq("status", "active"),
+            active_challenges = 0
+            if active_challenge_ids:
+                active_challenges_response = (
+                    supabase.table("challenge_members")
+                    .select("id", count="exact")
+                    .eq("user_id", friend_id)
+                    .in_("challenge_id", active_challenge_ids)
+                    .execute()
                 )
-                .execute()
-            )
-
-            active_challenges = active_challenges_response.count or 0
+                active_challenges = active_challenges_response.count or 0
 
             friends.append(
                 FriendProfile(
