@@ -59,17 +59,14 @@ async def env_check():
     Debug endpoint to check if environment variables are set
     WARNING: Remove this in production!
     """
-    import os
-    
-    supabase_url = os.environ.get("SUPABASE_URL", "")
-    
     return {
-        "supabase_url_set": bool(supabase_url),
-        "supabase_url_preview": supabase_url[:40] + "..." if supabase_url else "NOT_SET",
-        "supabase_service_key_set": bool(os.environ.get("SUPABASE_SERVICE_ROLE_KEY")),
-        "supabase_anon_key_set": bool(os.environ.get("SUPABASE_ANON_KEY")),
-        "environment": os.environ.get("ENVIRONMENT", "NOT_SET"),
-        "total_env_vars": len(os.environ),
+        "supabase_url_set": bool(settings.SUPABASE_URL),
+        "supabase_url_preview": settings.SUPABASE_URL[:40] + "..." if settings.SUPABASE_URL else "NOT_SET",
+        "supabase_service_key_set": bool(settings.SUPABASE_SERVICE_ROLE_KEY),
+        "supabase_anon_key_set": bool(settings.SUPABASE_ANON_KEY),
+        "environment": settings.ENVIRONMENT,
+        "debug": settings.DEBUG,
+        "app_name": settings.APP_NAME,
     }
 
 
