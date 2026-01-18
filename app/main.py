@@ -53,6 +53,26 @@ async def health_check():
     }
 
 
+@app.get("/debug/env-check")
+async def env_check():
+    """
+    Debug endpoint to check if environment variables are set
+    WARNING: Remove this in production!
+    """
+    import os
+    
+    supabase_url = os.environ.get("SUPABASE_URL", "")
+    
+    return {
+        "supabase_url_set": bool(supabase_url),
+        "supabase_url_preview": supabase_url[:40] + "..." if supabase_url else "NOT_SET",
+        "supabase_service_key_set": bool(os.environ.get("SUPABASE_SERVICE_ROLE_KEY")),
+        "supabase_anon_key_set": bool(os.environ.get("SUPABASE_ANON_KEY")),
+        "environment": os.environ.get("ENVIRONMENT", "NOT_SET"),
+        "total_env_vars": len(os.environ),
+    }
+
+
 @app.get("/")
 async def root():
     """
